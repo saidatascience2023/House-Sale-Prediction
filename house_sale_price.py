@@ -8,25 +8,60 @@ Original file is located at
 """
 
 import streamlit as st
+import pandas as pd
 import joblib
-import numpy as np
 
-# Load model and features
-model = joblib.load("model.pkl")
-features = joblib.load("features.pkl")
+st.set_page_config(page_title="💸 Price Prediction App", layout="centered")
 
-# Title
-st.title("🏠 House Price Prediction App")
+st.title("💸 Price Prediction App")
+st.markdown("Upload your **test CSV file** to predict prices using a pre-trained model.")
 
-# Input fields
-st.subheader("Enter the values for each feature:")
-user_input = []
+# Upload CSV file
+uploaded_file = st.file_uploader("📂 Upload test CSV file", type=["csv"])
 
-for feature in features:
-    value = st.number_input(f"{feature}", step=1.0)
-    user_input.append(value)
+# Load trained model
+@st.cache_resource
+def load_model():
+    try:
+        model = joblib.load("model.pkl")  # Ensure this file exists
+        return model
+    except FileNotFoundError:
+        st.error("⚠️ model.pkl file not found! Please place the trained model in the same folder.")
+        return None
 
-# Prediction
-if st.button("Predict"):
-    prediction = model.predict([user_input])[0]
-    st.success(f"💰 Predicted Sale Price: ${prediction:,.2f}")
+model = load_model()
+
+if uploaded_file is not None and model is not None:
+    try:
+        test_df = pd.read_csv(uploaded_file)
+        st.success("✅ File uploaded and read successfully!")
+
+        st.subheader("🔍 Test Data Preview")
+        st.dataframe(test_df)
+
+        st.subheader("📈 Predicting Prices...")
+        predictions = model.predict(test_df)
+
+        # Add predictions to dataframe
+        result_df = test_df.copy()
+        result_df["Predicted Price"] = [round(p, 2) for p in predictions]  # Rounded for display
+
+        # Show predictions
+        st.subheader("🧾 Full Predictions")
+        st.dataframe(result_df)
+
+        # Download button
+        csv_download = result_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="⬇️ Download Predictions as CSV",
+            data=csv_download,
+            file_name="predicted_prices.csv",
+            mime="text/csv"
+        )
+
+    except Exception as e:
+        st.error(f"❌ Error during prediction: {e}")
+elif uploaded_file is None:
+    st.info("Please upload a .csv file to begin.")
+
+#!pip install streamlit
